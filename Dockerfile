@@ -1,10 +1,8 @@
 FROM centos:7
 ENV container docker
 
-RUN yum -y install tar sudo git-all memcached postgresql-devel postgresql-server libxml2-devel libxslt-devel patch gcc-c++ openssl-devel gnupg curl which 
-RUN yum clean all
+RUN yum -y install tar sudo git-all memcached postgresql-devel postgresql-server libxml2-devel libxslt-devel patch gcc-c++ openssl-devel gnupg curl which --setopt=tsflags=nodocs; yum clean all;
 
-VOLUME [ "/sys/fs/cgroup" ]
 RUN systemctl enable memcached    
 RUN su  - postgres -c 'initdb' 
 RUN systemctl enable postgresql 
@@ -21,8 +19,6 @@ RUN /bin/bash -l -c "rvm use 2.2 --default"
 RUN /bin/bash -l -c "gem install bundler rake"
 RUN /bin/bash -l -c "gem install nokogiri -- --use-system-libraries"
 
-#RUN /usr/sbin/init & 
-
 RUN echo "======= Installing ManageIQ ======"
 RUN mkdir /manageiq
 WORKDIR /manageiq
@@ -36,3 +32,8 @@ EXPOSE 3000 4000
 
 
 CMD su postgres -c "psql -c \"CREATE ROLE root SUPERUSER LOGIN PASSWORD 'smartvm'\""; cd /manageiq/manageiq ; /bin/bash -l -c "./bin/docker_setup"  ;/bin/bash -l -c "bundle exec rake evm:start"
+
+# Eventual movement of systemd call via init
+# This volume call should be in the base image
+# VOLUME [ “/sys/fs/cgroup” ]
+# CMD [“/USR/SBIN/INIT”]
