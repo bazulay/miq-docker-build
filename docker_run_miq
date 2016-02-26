@@ -1,40 +1,16 @@
 #/bin/bash -x
 
-echo "/usr/sbin/init" 
-/usr/sbin/init 
 
-echo "========= sleep 10" 
-sleep 10 
+echo "========= psql -c \"CREATE ROLE root SUPERUSER LOGIN PASSWORD 'smartvm'\"" 
+su postgres -c "psql -c \"CREATE ROLE root SUPERUSER LOGIN PASSWORD 'smartvm'\"" 
 
-echo "========= systemctl status  postgresql"
-systemctl status  postgresql
+echo "========= cd /manageiq/manageiq"
+cd /manageiq/manageiq 
 
 
-echo "========= ls -la /var/run/postgresql/"
-ls -la /var/run/postgresql/
+echo "========= ./bin/docker_setup"
+/bin/bash -l -c "./bin/docker_setup"
 
 
-echo "========= systemctl start  postgresql"
-systemctl start  postgresql
-
-echo "========= sleep 10"
-sleep 10
-
-echo "========= ls -la /var/run/postgresql/"
-ls -la /var/run/postgresql/
-
-#sleep 3600
-
-#echo "========= psql -c \"CREATE ROLE root SUPERUSER LOGIN PASSWORD 'smartvm'\"" 
-#su postgres -c "psql -c \"CREATE ROLE root SUPERUSER LOGIN PASSWORD 'smartvm'\"" 
-
-#echo "========= cd /manageiq/manageiq"
-#cd /manageiq/manageiq 
-
-
-#echo "========= ./bin/docker_setup"
-#/bin/bash -l -c "./bin/docker_setup"
-
-
-#echo "========= bundle exec rake evm:start"
-#/bin/bash -l -c "bundle exec rake evm:start"
+echo "========= bundle exec rake evm:start"
+/bin/bash -l -c "bundle exec rake evm:start"

@@ -1,16 +1,24 @@
 FROM centos:7
 ENV container docker
 
-
 RUN rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 RUN yum -y install dnf
 RUN dnf -y install nodejs tar sudo git-all memcached postgresql-devel postgresql-server libxml2-devel libxslt-devel patch gcc-c++ openssl-devel gnupg curl which ; dnf clean all 
 
+# Set up systemd
+RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == systemd-tmpfiles-setup.service ] || rm -f $i; done); \
+rm -f /lib/systemd/system/multi-user.target.wants/*;\
+rm -f /etc/systemd/system/*.wants/*;\
+rm -f /lib/systemd/system/local-fs.target.wants/*; \
+rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+rm -f /lib/systemd/system/basic.target.wants/*;\
+rm -f /lib/systemd/system/anaconda.target.wants/*;
 VOLUME [ "/sys/fs/cgroup" ]
-RUN systemctl enable memcached    
-RUN su  - postgres -c 'initdb' 
-RUN systemctl enable postgresql 
 
+RUN systemctl enable memcached    
+RUN su  - postgres -c 'initdb -E UTF8' 
+RUN systemctl enable postgresql 
 
 ## 2. RVM
 RUN /usr/bin/curl -sSL https://rvm.io/mpapis.asc | gpg2 --import -
@@ -22,8 +30,6 @@ RUN /bin/bash -l -c "rvm install ruby 2.2.3"
 RUN /bin/bash -l -c "rvm use 2.2.3 --default"
 RUN /bin/bash -l -c "gem install bundler rake"
 RUN /bin/bash -l -c "gem install nokogiri -- --use-system-libraries"
-
-#RUN /usr/sbin/init & 
 
 RUN echo "======= Installing ManageIQ ======"
 RUN mkdir /manageiq
@@ -37,8 +43,8 @@ RUN echo "====== EVM has been set up ======"
 
 EXPOSE 3000 4000
 
-
 #CMD /usr/sbin/init & ; sleep 10 ; su postgres -c "psql -c \"CREATE ROLE root SUPERUSER LOGIN PASSWORD 'smartvm'\""; cd /manageiq/manageiq ; /bin/bash -l -c "./bin/docker_setup"  ;/bin/bash -l -c "bundle exec rake evm:start"
 
 
-CMD cd /manageiq/manageiq ; ./bin/docker_run_miq
+# CMD cd /manageiq/manageiq ; ./bin/docker_run_miq
+CMD [ "/usr/sbin/init" ]
