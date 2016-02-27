@@ -3,7 +3,7 @@ ENV container docker
 
 RUN rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 RUN yum -y install dnf
-RUN dnf -y install nodejs tar sudo git-all memcached postgresql-devel postgresql-server libxml2-devel libxslt-devel patch gcc-c++ openssl-devel gnupg curl which ; dnf clean all 
+RUN dnf -y install nodejs tar sudo git-all memcached postgresql-devel postgresql-server libxml2-devel libxslt-devel patch gcc-c++ openssl-devel gnupg curl which net-tools ; dnf clean all
 
 # Set up systemd
 RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == systemd-tmpfiles-setup.service ] || rm -f $i; done); \
@@ -16,9 +16,9 @@ rm -f /lib/systemd/system/basic.target.wants/*;\
 rm -f /lib/systemd/system/anaconda.target.wants/*;
 VOLUME [ "/sys/fs/cgroup" ]
 
-RUN systemctl enable memcached    
-RUN su  - postgres -c 'initdb -E UTF8' 
-RUN systemctl enable postgresql 
+RUN systemctl enable memcached
+RUN su  - postgres -c 'initdb -E UTF8'
+RUN systemctl enable postgresql
 
 ## 2. RVM
 RUN /usr/bin/curl -sSL https://rvm.io/mpapis.asc | gpg2 --import -
