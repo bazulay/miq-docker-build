@@ -1,9 +1,6 @@
 #/bin/bash -x
 
 
-echo "========= psql -c \"CREATE ROLE root SUPERUSER LOGIN PASSWORD 'smartvm'\"" 
-su postgres -c "psql -c \"CREATE ROLE root SUPERUSER LOGIN PASSWORD 'smartvm'\"" 
-
 echo "========= cd /manageiq/manageiq"
 cd /manageiq/manageiq 
 
