@@ -32,6 +32,7 @@ RUN /bin/bash -l -c "gem install bundler rake"
 RUN /bin/bash -l -c "gem install nokogiri -- --use-system-libraries"
 
 RUN echo "======= Installing ManageIQ ======"
+RUN su postgres -c "pg_ctl -D /var/lib/pgsql/data start" && sleep 5 && su postgres -c "psql -c \"CREATE ROLE root SUPERUSER LOGIN PASSWORD 'smartvm'\"" && su postgres -c "pg_ctl -D /var/lib/pgsql/data stop"
 RUN mkdir /manageiq
 WORKDIR /manageiq
 RUN git clone https://github.com/ManageIQ/manageiq
