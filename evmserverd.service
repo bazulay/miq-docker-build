@@ -1,0 +1,13 @@
+[Unit]
+Description=EVM server daemon
+After=network.target memcached.service postgresql.service
+
+[Service]
+
+ExecStart=/manageiq/bin/evmserver.sh start
+ExecStop=/manageiq/bin/evmserver.sh stop
+Type=forking
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
