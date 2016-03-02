@@ -30,7 +30,7 @@ RUN su postgres -c 'initdb -D /var/lib/pgsql/data'
 RUN /usr/bin/curl -sSL https://rvm.io/mpapis.asc | gpg2 --import -
 RUN /usr/bin/curl -sSL https://get.rvm.io | rvm_tar_command=tar bash -s stable
 RUN source /etc/profile.d/rvm.sh ; echo "gem: --no-ri --no-rdoc --no-document" > ~/.gemrc
-RUN /bin/bash -l -c "rvm requirements ; rvm install ruby 2.2.4 ; rvm use 2.2.4 --default ; gem install bundler rake ; gem install nokogiri -- --use-system-libraries" 
+RUN /bin/bash -l -c "rvm requirements ; rvm install ruby 2.2.4 ; rvm use 2.2.4 --default ; gem install bundler rake ; gem install nokogiri -- --use-system-libraries ; rvm cleanup all ; yum clean all"
 
 # GIT clone and prepare services
 RUN mkdir /manageiq && git clone https://github.com/ManageIQ/manageiq /manageiq
