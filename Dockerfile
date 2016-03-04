@@ -7,10 +7,10 @@ ENV container docker
 # Only needed if building with docker-1.8
 ENV LANG en_US.UTF-8  
 
-RUN rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && yum -y install dnf && yum clean all
-RUN dnf -y install nodejs tar sudo git-all memcached postgresql-devel postgresql-server libxml2-devel libxslt-devel patch gcc-c++ openssl-devel gnupg curl which net-tools ; dnf clean all 
+# Install EPEL repo, yum necessary packages for the build without docs, clean all caches (no DNF)
+RUN rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && yum -y install --setopt=tsflags=nodocs nodejs tar sudo git memcached postgresql-devel postgresql-server libxml2-devel libxslt-devel patch gcc-c++ openssl-devel gnupg curl which net-tools libyaml-devel autoconf readline-devel libffi-devel bzip2 automake libtool bison sqlite-devel ; yum clean all
 
-# Set up systemd and apply cleanups
+# Systemd cleanups, setup volumes
 RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == systemd-tmpfiles-setup.service ] || rm -f $i; done); \
 rm -f /lib/systemd/system/multi-user.target.wants/*;\
 rm -f /etc/systemd/system/*.wants/*;\
@@ -21,29 +21,34 @@ rm -f /lib/systemd/system/basic.target.wants/*;\
 rm -f /lib/systemd/system/anaconda.target.wants/*;
 VOLUME [ "/sys/fs/cgroup" ]
 
-# MEMCACHED and POSTGRESQL
-RUN systemctl enable memcached postgresql
+# POSTGRESQL INIT
 # Do not call a login "-" su, resets the ENV
 RUN su postgres -c 'initdb -D /var/lib/pgsql/data'
 
 ## 2. RVM
-RUN /usr/bin/curl -sSL https://rvm.io/mpapis.asc | gpg2 --import -
-RUN /usr/bin/curl -sSL https://get.rvm.io | rvm_tar_command=tar bash -s stable
-RUN source /etc/profile.d/rvm.sh ; echo "gem: --no-ri --no-rdoc --no-document" > ~/.gemrc
-RUN /bin/bash -l -c "rvm requirements ; rvm install ruby 2.2.4 ; rvm use 2.2.4 --default ; gem install bundler rake ; gem install nokogiri -- --use-system-libraries ; rvm cleanup all ; yum clean all"
+# Download and install RVM, setup environment, install ruby/gems, clean all
+# Note: RVM uses yum to bring missing pre-reqs
 
-# GIT clone and prepare services
-RUN mkdir /manageiq && git clone https://github.com/ManageIQ/manageiq /manageiq
-#RUN mkdir /manageiq && cd /manageiq && git clone https://github.com/ManageIQ/manageiq
+RUN /usr/bin/curl -sSL https://rvm.io/mpapis.asc | gpg2 --import - && /usr/bin/curl -sSL https://get.rvm.io | rvm_tar_command=tar bash -s stable && source /etc/profile.d/rvm.sh && echo "gem: --no-ri --no-rdoc --no-document" > ~/.gemrc && /bin/bash -l -c "rvm requirements ; rvm install ruby 2.2.4 ; rvm use 2.2.4 --default ; gem install bundler rake ; gem install nokogiri -- --use-system-libraries ; rvm cleanup all ; yum clean all ; rvm disk-usage all"
+
+# GIT clone and prepare services (shallow clone)
+RUN mkdir /manageiq && git clone --depth 1 https://github.com/ManageIQ/manageiq /manageiq
+
+# Change workdir to clone, prepare database, start it, run docker_setup, shutdown and cleanup all
 WORKDIR /manageiq
 COPY docker_setup bin/docker_setup
 RUN su postgres -c "pg_ctl -D /var/lib/pgsql/data start" && sleep 5 && su postgres -c "psql -c \"CREATE ROLE root SUPERUSER LOGIN PASSWORD 'smartvm'\"" && su postgres -c "pg_ctl -D /var/lib/pgsql/data stop"
-RUN su postgres -c "pg_ctl -D /var/lib/pgsql/data start" && bash -l -c "/usr/bin/memcached -u memcached -p 11211 -m 64 -c 1024 -l 127.0.0.1 &" && /bin/bash -l -c "bin/docker_setup" && su postgres -c "pg_ctl -D /var/lib/pgsql/data stop" && killall memcached
+RUN su postgres -c "pg_ctl -D /var/lib/pgsql/data start" && /bin/bash -l -c "/usr/bin/memcached -u memcached -p 11211 -m 64 -c 1024 -l 127.0.0.1 &" && /bin/bash -l -c "bin/docker_setup" && su postgres -c "pg_ctl -D /var/lib/pgsql/data stop" && pkill memcached && /bin/bash -l -c "rvm cleanup all ; rm -vf $(/usr/local/rvm/bin/rvm gemdir)/cache/* ; rvm disk-usage all"
+
+# Copy evmserver startup script and systemd evmserverd unit file
 COPY evmserver.sh bin/evmserver.sh
 COPY evmserverd.service /usr/lib/systemd/system/evmserverd.service
-RUN systemctl enable evmserverd
 
+# Enable services on systemd
+RUN systemctl enable evmserverd memcached postgresql
+
+# Expose required container ports
 EXPOSE 3000 4000
 
-# Bring up all services via systemd (fix me need evm systemd unit files)
+# Call systemd to bring up system
 CMD [ "/usr/sbin/init" ]
