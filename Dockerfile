@@ -29,16 +29,16 @@ RUN su postgres -c 'initdb -D /var/lib/pgsql/data'
 # Download and install RVM, setup environment, install ruby/gems, clean all
 # Note: RVM uses yum to bring missing pre-reqs
 
-RUN /usr/bin/curl -sSL https://rvm.io/mpapis.asc | gpg2 --import - && /usr/bin/curl -sSL https://get.rvm.io | rvm_tar_command=tar bash -s stable && source /etc/profile.d/rvm.sh && echo "gem: --no-ri --no-rdoc --no-document" > ~/.gemrc && /bin/bash -l -c "rvm requirements ; rvm install ruby 2.2.4 ; rvm use 2.2.4 --default ; gem install bundler rake ; gem install nokogiri -- --use-system-libraries ; rvm cleanup all ; yum clean all ; rvm disk-usage all"
+RUN /usr/bin/curl -sSL https://rvm.io/mpapis.asc | gpg2 --import - && /usr/bin/curl -sSL https://get.rvm.io | rvm_tar_command=tar bash -s stable && source /etc/profile.d/rvm.sh && echo "gem: --no-ri --no-rdoc --no-document" > ~/.gemrc && /bin/bash -l -c "rvm requirements ; rvm install ruby 2.2.3 ; rvm use 2.2.3 --default ; gem install bundler rake ; gem install nokogiri -- --use-system-libraries ; rvm cleanup all ; yum clean all ; rvm disk-usage all"
 
 # GIT clone and prepare services (shallow clone)
 RUN mkdir /manageiq && git clone --depth 1 https://github.com/ManageIQ/manageiq /manageiq
 
-# Change workdir to clone, prepare database, start it, run docker_setup, shutdown and cleanup all
+# Change workdir to clone, prepare database, start it, run setup, shutdown and cleanup all
 WORKDIR /manageiq
-COPY docker_setup bin/docker_setup
+#COPY docker_setup bin/docker_setup
 RUN su postgres -c "pg_ctl -D /var/lib/pgsql/data start" && sleep 5 && su postgres -c "psql -c \"CREATE ROLE root SUPERUSER LOGIN PASSWORD 'smartvm'\"" && su postgres -c "pg_ctl -D /var/lib/pgsql/data stop"
-RUN su postgres -c "pg_ctl -D /var/lib/pgsql/data start" && /bin/bash -l -c "/usr/bin/memcached -u memcached -p 11211 -m 64 -c 1024 -l 127.0.0.1 &" && /bin/bash -l -c "bin/docker_setup" && su postgres -c "pg_ctl -D /var/lib/pgsql/data stop" && pkill memcached && /bin/bash -l -c "rvm cleanup all ; rm -vf $(/usr/local/rvm/bin/rvm gemdir)/cache/* ; rvm disk-usage all"
+RUN su postgres -c "pg_ctl -D /var/lib/pgsql/data start" && /bin/bash -l -c "/usr/bin/memcached -u memcached -p 11211 -m 64 -c 1024 -l 127.0.0.1 &" && /bin/bash -l -c "bin/setup" && su postgres -c "pg_ctl -D /var/lib/pgsql/data stop" && pkill memcached && /bin/bash -l -c "rvm cleanup all ; rm -vf $(/usr/local/rvm/bin/rvm gemdir)/cache/* ; rvm disk-usage all"
 
 # Copy evmserver startup script and systemd evmserverd unit file
 COPY evmserver.sh bin/evmserver.sh
