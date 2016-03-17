@@ -1,54 +1,63 @@
 FROM centos:7
 ENV container docker
 
-# Set locale manually on build (docker defaults to POSIX which causes initdb to set the wrong db encoding, MIQ must have UTF8)
-# Once systemd is online, it will set locale based /etc/locale.conf
+# Set ENV, LANG only needed if building with docker-1.8
+ENV LANG en_US.UTF-8
+ENV TERM xterm
 
-# Only needed if building with docker-1.8
-ENV LANG en_US.UTF-8  
+## Install EPEL repo, yum necessary packages for the build without docs, clean all caches
 
-# Install EPEL repo, yum necessary packages for the build without docs, clean all caches (no DNF)
-RUN rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && yum -y install --setopt=tsflags=nodocs nodejs tar sudo git memcached postgresql-devel postgresql-server libxml2-devel libxslt-devel patch gcc-c++ openssl-devel gnupg curl which net-tools libyaml-devel autoconf readline-devel libffi-devel bzip2 automake libtool bison sqlite-devel ; yum clean all
+RUN yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && \
+yum -y install --setopt=tsflags=nodocs \ 
+nodejs git postgresql-devel postgresql-server patch gcc-c++ openssl-devel \
+net-tools which libyaml-devel readline-devel libffi-devel memcached \
+make bzip2 bison cmake libtool libxml2-devel libxslt-devel sqlite-devel && \
+yum clean all
 
-# Systemd cleanups, setup volumes
-RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == systemd-tmpfiles-setup.service ] || rm -f $i; done); \
-rm -f /lib/systemd/system/multi-user.target.wants/*;\
-rm -f /etc/systemd/system/*.wants/*;\
-rm -f /lib/systemd/system/local-fs.target.wants/*; \
-rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
-rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
-rm -f /lib/systemd/system/basic.target.wants/*;\
-rm -f /lib/systemd/system/anaconda.target.wants/*;
-VOLUME [ "/sys/fs/cgroup" ]
+# Add persistent data volume for postgres
+VOLUME [ "/var/lib/pgsql/data" ]
 
-# POSTGRESQL INIT
-# Do not call a login "-" su, resets the ENV
-RUN su postgres -c 'initdb -D /var/lib/pgsql/data'
+# Download chruby and chruby-install, install, setup environment, clean all
 
-## 2. RVM
-# Download and install RVM, setup environment, install ruby/gems, clean all
-# Note: RVM uses yum to bring missing pre-reqs
+RUN curl -sL https://github.com/postmodern/chruby/archive/v0.3.9.tar.gz | tar xz && \
+cd chruby-0.3.9 && make install && scripts/setup.sh && \
+echo "gem: --no-ri --no-rdoc --no-document" > ~/.gemrc && \
+echo "source /usr/local/share/chruby/chruby.sh" >> ~/.bashrc && \ 
+curl -sL https://github.com/postmodern/ruby-install/archive/v0.6.0.tar.gz | tar xz && \
+cd ruby-install-0.6.0 && make install && ruby-install ruby 2.2.4 -- --disable-install-doc && \
+echo "chruby ruby-2.2.4" >> ~/.bash_profile && \
+rm -rf ~/ruby* && rm -rf /usr/local/src/* && yum clean all
 
-RUN /usr/bin/curl -sSL https://rvm.io/mpapis.asc | gpg2 --import - && /usr/bin/curl -sSL https://get.rvm.io | rvm_tar_command=tar bash -s stable && source /etc/profile.d/rvm.sh && echo "gem: --no-ri --no-rdoc --no-document" > ~/.gemrc && /bin/bash -l -c "rvm requirements ; rvm install ruby 2.2.4 ; rvm use 2.2.4 --default ; gem install bundler rake ; gem install nokogiri -- --use-system-libraries ; rvm cleanup all ; yum clean all ; rvm disk-usage all"
+## Create basedir, GIT clone miq (shallow)
 
-# GIT clone and prepare services (shallow clone)
-RUN mkdir /manageiq && git clone --depth 1 https://github.com/ManageIQ/manageiq /manageiq
+RUN mkdir -p /manageiq && git clone --depth 1 https://github.com/ManageIQ/manageiq /manageiq
 
-# Change workdir to clone, prepare database, start it, run docker_setup, shutdown and cleanup all
+## Change WORKDIR to clone dir, copy docker_setup, start all, docker_setup, shutdown all, clean all
 WORKDIR /manageiq
 COPY docker_setup bin/docker_setup
-RUN su postgres -c "pg_ctl -D /var/lib/pgsql/data start" && sleep 5 && su postgres -c "psql -c \"CREATE ROLE root SUPERUSER LOGIN PASSWORD 'smartvm'\"" && su postgres -c "pg_ctl -D /var/lib/pgsql/data stop"
-RUN su postgres -c "pg_ctl -D /var/lib/pgsql/data start" && /bin/bash -l -c "/usr/bin/memcached -u memcached -p 11211 -m 64 -c 1024 -l 127.0.0.1 &" && /bin/bash -l -c "bin/docker_setup" && su postgres -c "pg_ctl -D /var/lib/pgsql/data stop" && pkill memcached && /bin/bash -l -c "rvm cleanup all ; rm -vf $(/usr/local/rvm/bin/rvm gemdir)/cache/* ; rvm disk-usage all"
+RUN /bin/bash -l -c "/usr/bin/memcached -u memcached -p 11211 -m 64 -c 1024 -l 127.0.0.1 -d && \
+bin/docker_setup --no-db --no-tests && \
+pkill memcached && \
+rm -rvf /opt/rubies/ruby-2.2.4/lib/ruby/gems/2.2.0/cache/*"
 
-# Copy evmserver startup script and systemd evmserverd unit file
+## Environment for scripts
+RUN echo "export BASEDIR=/manageiq" > /etc/default/evm && \
+echo "export PATH=$PATH:/opt/rubies/ruby-2.2.4/bin" >> /etc/default/evm
+
+## Copy db init script, evmserver startup script and systemd evmserverd unit file
+COPY docker_initdb bin/docker_initdb
 COPY evmserver.sh bin/evmserver.sh
 COPY evmserverd.service /usr/lib/systemd/system/evmserverd.service
 
-# Enable services on systemd
-RUN systemctl enable evmserverd memcached postgresql
+## Scripts symblinks
+RUN ln -s /manageiq/bin/evmserver.sh /usr/bin && \
+ln -s /manageiq/bin/docker_initdb /usr/bin
 
-# Expose required container ports
+## Enable services on systemd
+RUN systemctl enable evmserverd memcached
+
+## Expose required container ports
 EXPOSE 3000 4000
 
-# Call systemd to bring up system
+## Call systemd to bring up system
 CMD [ "/usr/sbin/init" ]

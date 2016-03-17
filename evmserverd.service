@@ -3,9 +3,10 @@ Description=EVM server daemon
 After=network.target memcached.service postgresql.service
 
 [Service]
-
-ExecStart=/manageiq/bin/evmserver.sh start
-ExecStop=/manageiq/bin/evmserver.sh stop
+TimeoutStartSec=5m
+ExecStartPre=/usr/bin/docker_initdb
+ExecStart=/usr/bin/evmserver.sh start
+ExecStop=/usr/bin/evmserver.sh stop
 Type=forking
 Restart=on-failure
 

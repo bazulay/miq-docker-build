@@ -1,14 +1,9 @@
 #!/bin/bash
 
-PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+# Source EVM environment 
+[ -f /etc/default/evm ] &&  . /etc/default/evm
 
-# Base MIQ installation dir
-
-BASEDIR=/manageiq
-cd $BASEDIR
-
-# Source RVM environment
-. /etc/profile.d/rvm.sh
+cd ${BASEDIR}
 
 start() {
   bundle exec rake evm:start
