@@ -1,5 +1,5 @@
 # miq-docker-build
 
-docker build -t miq .
+docker build -t miq-devel .
 
-docker run  --privileged -dt -v /sys/fs/cgroup:/sys/fs/cgroup:ro miq
+docker run --privileged -di -p 3000:3000 -p 4000:4000 miq-devel
