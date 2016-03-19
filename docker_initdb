@@ -4,18 +4,17 @@
 [ -f /etc/default/evm ] &&  . /etc/default/evm
 
 # Check postgres server DB init status, if necessary, initdb, start/enable service and inject MIQ role
-PGDATA=/var/lib/pgsql/data
-PG_CHECK_DB=/usr/bin/postgresql-check-db-dir
-
-if [ -x ${PG_CHECK_DB} ]; then
+# postgresql-check-db-dir needs PGDATA set
+export PGDATA=${APPLIANCE_PG_DATA}
+if [ -x ${APPLIANCE_PG_CHECKDB} ]; then
 
         echo "== Checking MIQ database status =="
-        ${PG_CHECK_DB} ${PGDATA}
+        ${APPLIANCE_PG_CHECKDB} {APPLIANCE_PG_DATA}
                 if [ $? -eq 0 ]; then
-                        systemctl is-active -q postgresql
+                        systemctl is-active -q ${APPLIANCE_PG_SERVICE}
                         if [ $? -ne 0 ]; then
                                 echo "** Postgresql is inactive, starting service"
-                                systemctl start postgresql
+                                systemctl start ${APPLIANCE_PG_SERVICE}
                                 test $? -ne 0 && echo "!! Failed to start postgresql service" && exit 1
                                 echo "** Postgresql is now online"
                         fi
@@ -26,10 +25,10 @@ if [ -x ${PG_CHECK_DB} ]; then
                 else
                         echo "** DB has not been initialized"
                         echo "** Launching initdb"
-                        su postgres -c "initdb -D ${PGDATA}"
+                        su postgres -c "initdb -D ${APPLIANCE_PG_DATA}"
                         test $? -ne 0 && echo "!! Failed to initdb" && exit 1
                         echo "** Starting postgresql"
-                        systemctl start postgresql
+                        systemctl start ${APPLIANCE_PG_SERVICE}
                         test $? -ne 0 && echo "!! Failed to start postgresql service" && exit 1
                         echo "** Creating MIQ role"
                         su postgres -c "psql -c \"CREATE ROLE root SUPERUSER LOGIN PASSWORD 'smartvm'\""
@@ -38,11 +37,11 @@ if [ -x ${PG_CHECK_DB} ]; then
                         ${BASEDIR}/bin/docker_setup
                         test $? -ne 0 && echo "!! ${BASEDIR}/bin/docker_setup failed to run" && exit 1
                         echo "** MIQ database has been initialized"
-                        systemctl enable -q postgresql
+                        systemctl enable -q ${APPLIANCE_PG_SERVICE}
                         exit 0
                 fi
 else
-        echo "Failed to find ${PG_CHECK_DB}, is postgres server installed?"
+        echo "Failed to find ${APPLIANCE_PG_CHECKDB}, is postgresql server installed?"
         exit 1
 fi
 }
