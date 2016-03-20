@@ -44,4 +44,3 @@ else
         echo "Failed to find ${APPLIANCE_PG_CHECKDB}, is postgresql server installed?"
         exit 1
 fi
-}
