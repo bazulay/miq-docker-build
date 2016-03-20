@@ -65,7 +65,7 @@ RUN mkdir -p /manageiq && git clone --depth 1 https://github.com/ManageIQ/manage
 
 ## Change WORKDIR to clone dir, copy docker_setup, start all, docker_setup, shutdown all, clean all
 WORKDIR /manageiq
-COPY docker_setup bin/docker_setup
+COPY docker-assets/docker_setup bin/docker_setup
 RUN /bin/bash -l -c "/usr/bin/memcached -u memcached -p 11211 -m 64 -c 1024 -l 127.0.0.1 -d && \
     source /etc/default/evm && \
     bin/docker_setup --no-db --no-tests && \
@@ -73,9 +73,9 @@ RUN /bin/bash -l -c "/usr/bin/memcached -u memcached -p 11211 -m 64 -c 1024 -l 1
     rm -rvf /opt/rubies/ruby-2.2.4/lib/ruby/gems/2.2.0/cache/*"
 
 ## Copy db init script, evmserver startup script and systemd evmserverd unit file
-COPY docker_initdb bin/docker_initdb
-COPY evmserver.sh bin/evmserver.sh
-COPY evmserverd.service /usr/lib/systemd/system/evmserverd.service
+COPY docker-assets/docker_initdb bin/docker_initdb
+COPY docker-assets/evmserver.sh bin/evmserver.sh
+COPY docker-assets/evmserverd.service /usr/lib/systemd/system/evmserverd.service
 
 ## Scripts symblinks
 RUN ln -s /manageiq/bin/evmserver.sh /usr/bin && \
