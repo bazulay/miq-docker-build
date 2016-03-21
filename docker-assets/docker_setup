@@ -3,7 +3,7 @@ require 'pathname'
 require 'optparse'
 
 
-options = {:do_tests => true, :do_db => true}
+options = {:do_bundle => true, :do_tests => true, :do_db => true}
 OptionParser.new do |opts|
   opts.banner = "Usage: setup [options]"
   opts.on("-d", "--no-db", "Do not prepare db") do
@@ -11,6 +11,9 @@ OptionParser.new do |opts|
   end
   opts.on("-t", "--no-tests", "Do not perform tests") do
     options[:do_tests] = false
+  end
+  opts.on("-b", "--no-bundle", "Do not run bundle") do
+    options[:do_bundle] = false
   end
   opts.on("-h", "--help", "Displays this help") do
     puts opts
@@ -23,10 +26,11 @@ end.parse!
 APP_ROOT = Pathname.new File.expand_path('../../',  __FILE__)
 
 Dir.chdir APP_ROOT do
+ if options[:do_bundle]
   puts "== Installing dependencies =="
   system "gem install bundler --conservative"
   system "bundle check || bundle install"
-
+ end
   puts "\n== Copying sample files =="
   unless File.exist?("config/database.yml")
     system "cp config/database.pg.yml config/database.yml"
