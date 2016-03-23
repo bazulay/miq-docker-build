@@ -33,6 +33,7 @@ RUN yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.n
                    rh-postgresql94-postgresql-devel  \
                    readline-devel          \
                    sqlite-devel            \
+                   sysvinit-tools          \
                    which                   \
                    &&                      \
     yum clean all
@@ -48,7 +49,7 @@ RUN curl -sL https://github.com/postmodern/chruby/archive/v0.3.9.tar.gz | tar xz
     curl -sL https://github.com/postmodern/ruby-install/archive/v0.6.0.tar.gz | tar xz && \
     cd ruby-install-0.6.0 && make install && ruby-install ruby 2.2.4 -- --disable-install-doc && \
     echo "chruby ruby-2.2.4" >> ~/.bash_profile && \
-    rm -rf ~/ruby* && rm -rf /usr/local/src/* && yum clean all
+    rm -rf /chruby-* && rm -rf /usr/local/src/* && yum clean all
 
 ## Environment for scripts
 RUN echo "export BASEDIR=/manageiq" > /etc/default/evm && \
@@ -85,7 +86,35 @@ RUN ln -s /manageiq/bin/evmserver.sh /usr/bin && \
 RUN systemctl enable evmserverd memcached
 
 ## Expose required container ports
-EXPOSE 3000 4000
+EXPOSE 3000 4000 5900-5999
+
+# Atomic Labels
+# The UNINSTALL label by DEFAULT will attempt to delete a container (rm) and image (rmi) if the container NAME is the same as the actual IMAGE
+# NAME is set via -n flag to ALL atomic commands (install,run,stop,uninstall)
+
+LABEL name="manageiq" \
+          vendor="ManageIQ" \
+          version="Capablanca" \
+          release="latest" \
+          url="http://manageiq.org/" \
+          summary="ManageIQ development image" \
+          description="ManageIQ is a management and automation platform for virtual, private, and hybrid cloud infrastructures." \
+          INSTALL='docker run -ti --privileged \
+                    --name ${NAME}_install \
+                    --entrypoint /usr/bin/docker_initdb \
+                    $IMAGE' \
+          RUN='docker run -di --privileged \
+                    --name ${NAME}_run \
+                    -v /etc/localtime:/etc/localtime:ro \
+                    --volumes-from ${NAME}_install \
+                    -p 3000:3000 \
+                    -p 4000:4000 \
+                    -p 5900-5999:5900-5999 \
+                    $IMAGE' \
+          STOP='docker stop ${NAME}_run && \
+          echo "Container ${NAME}_run has been stopped"' \
+          UNINSTALL='docker rm -v ${NAME}_install ${NAME}_run && \
+          echo "Uninstallation complete"'
 
 ## Call systemd to bring up system
 CMD [ "/usr/sbin/init" ]
