@@ -1,5 +1,6 @@
 FROM centos:7
 ENV container docker
+MAINTAINER ManageIQ https://github.com/ManageIQ/manageiq-appliance-build
 
 # Set ENV, LANG only needed if building with docker-1.8
 ENV LANG en_US.UTF-8
@@ -96,24 +97,25 @@ LABEL name="manageiq" \
           vendor="ManageIQ" \
           version="Capablanca" \
           release="latest" \
+          architecture="x86_64" \
           url="http://manageiq.org/" \
           summary="ManageIQ development image" \
           description="ManageIQ is a management and automation platform for virtual, private, and hybrid cloud infrastructures." \
           INSTALL='docker run -ti --privileged \
-                    --name ${NAME}_install \
+                    --name ${NAME}_volume \
                     --entrypoint /usr/bin/docker_initdb \
                     $IMAGE' \
           RUN='docker run -di --privileged \
                     --name ${NAME}_run \
                     -v /etc/localtime:/etc/localtime:ro \
-                    --volumes-from ${NAME}_install \
+                    --volumes-from ${NAME}_volume \
                     -p 3000:3000 \
                     -p 4000:4000 \
                     -p 5900-5999:5900-5999 \
                     $IMAGE' \
           STOP='docker stop ${NAME}_run && \
           echo "Container ${NAME}_run has been stopped"' \
-          UNINSTALL='docker rm -v ${NAME}_install ${NAME}_run && \
+          UNINSTALL='docker rm -v ${NAME}_volume ${NAME}_run && \
           echo "Uninstallation complete"'
 
 ## Call systemd to bring up system
